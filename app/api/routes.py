@@ -33,6 +33,8 @@ def create_project(body: ProjectCreate, service: ProjectService = Depends(get_pr
     except Exception as e:
         raise to_http(e)
     
+
+
 # TO-DO: GET /projects
 # TO-DO: GET /projects/{project_id}
 # @router.get('/projects/{project_id}', response_model=ProjectOut)
@@ -40,3 +42,19 @@ def create_project(body: ProjectCreate, service: ProjectService = Depends(get_pr
 # TO-DO POST /projects/{project_id}/tasks
 # TO-DO GET /projects/{project_id}/tasks
 # TO-DO DELETE /tasks/{task_id}
+
+@router.get('/projects', response_model=list[ProjectOut])
+def get_projects(service: ProjectService = Depends(get_project_service)):
+    try:
+        projects = service.list()
+        return [ProjectOut(id=p.id, name=p.name) for p in projects]
+    except Exception as e:
+        raise to_http(e)
+    
+@router.get('/projects/{project_id}', response_model=ProjectOut)
+def get_project(project_id: str, service: ProjectService = Depends(get_project_service)):
+    try:
+        project = service.get(project_id)
+        return ProjectOut(id=project.id, name=project.name)
+    except Exception as e:
+        raise to_http(e)
