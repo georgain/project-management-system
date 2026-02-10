@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from app.domain.enums import TaskStatus
 
 from app.domain.exceptions import DomainError, NotFoundError, InvalidStatusTransition, ValidationError
 from app.repositories.memory import InMemoryProjectRepo, InMemoryTaskRepo
@@ -19,11 +20,11 @@ def get_task_service() -> TaskService:
 
 def to_http(e: Exception) -> HTTPException:
     if isinstance(e, NotFoundError):
-        return HTTPException(status_code = 404, details=str(e))
-    if isinstance(e, InvalidStatusTransition, ValidationError, ValueError):
-        return HTTPException(status_code = 400, details=str(e))
+        return HTTPException(status_code = 404, detail=str(e))
+    if isinstance(e,( InvalidStatusTransition, ValidationError, ValueError)):
+        return HTTPException(status_code = 400, detail=str(e))
     if isinstance(e, DomainError):
-        return HTTPException(status_code=500, details='Internal Server Error')
+        return HTTPException(status_code=500, detail='Internal Server Error')
 
 @router.post('/projects',response_model = ProjectOut ,status_code = 201)
 def create_project(body: ProjectCreate, service: ProjectService = Depends(get_project_service)):
@@ -56,5 +57,86 @@ def get_project(project_id: str, service: ProjectService = Depends(get_project_s
     try:
         project = service.get(project_id)
         return ProjectOut(id=project.id, name=project.name)
+    except Exception as e:
+        raise to_http(e)
+
+
+
+
+
+
+
+
+@router.post(
+    "/projects/{project_id}/tasks",
+    response_model=TaskOut,
+    status_code=201
+)
+def create_task(
+    project_id: str,
+    body: TaskCreate,
+    service: TaskService = Depends(get_task_service)
+):
+    try:
+        task = service.create_task(
+            project_id=project_id,
+            title=body.title,
+            task_type=body.task_type,
+            due_date=body.due_date
+        )
+
+        # workaround obligatorio
+        task._status = TaskStatus.TODO
+
+        return TaskOut(
+            id=task.id,
+            project_id=project_id,
+            title=task.title,
+            status=task.status,
+            priority_score=task.priority_score,
+            due_date=task.due_date
+        )
+    except Exception as e:
+        raise to_http(e)
+
+
+@router.get(
+    "/projects/{project_id}/tasks",
+    response_model=list[TaskOut]
+)
+def get_tasks_by_project(
+    project_id: str,
+    service: TaskService = Depends(get_task_service)
+):
+    try:
+        tasks = service.list_tasks(project_id)
+
+        return [
+            TaskOut(
+                id=task.id,
+                project_id=project_id,
+                title=task.title,
+                status=task.status,
+                priority_score=task.priority_score,
+                due_date=task.due_date
+            )
+            for task in tasks
+        ]
+
+    except Exception as e:
+        raise to_http(e)
+
+
+@router.delete(
+    "/tasks/{task_id}",
+    status_code=204
+)
+def delete_task(
+    task_id: str,
+    service: TaskService = Depends(get_task_service)
+):
+    try:
+        service.delete_task(task_id)
+        return
     except Exception as e:
         raise to_http(e)
